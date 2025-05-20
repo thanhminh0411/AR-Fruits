@@ -40,37 +40,39 @@
         transform: translateX(-50%);
         display: flex;
         flex-direction: row;
-        gap: 6px;
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        padding: 8px 10px;
-        border-radius: 14px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        gap: 10px;
+        background: none;
+        box-shadow: none;
+        border: none;
         z-index: 999;
-        touch-action: manipulation;
-        border: 1px solid rgba(255, 255, 255, 0.5);
         width: auto;
         max-width: 95%;
       }
       .control-button {
-        padding: 7px 8px;
-        font-size: 11px;
-        font-weight: 500;
-        border: none;
-        border-radius: 10px;
-        background: linear-gradient(145deg, #ef2e25, #c41c13);
-        color: white;
+        padding: 12px 22px;
+        font-size: 17px;
+        font-weight: 900;
+        border: 3px solid #fcc346;
+        border-radius: 20px;
+        background: linear-gradient(120deg, #6cc1c8 60%, #fcc346 100%);
+        color: #fff;
         cursor: pointer;
-        touch-action: manipulation;
-        box-shadow: 0 3px 10px rgba(222, 34, 25, 0.3);
-        transition: all 0.2s ease;
+        box-shadow:
+          0 6px 0 #f7a440,
+          0 10px 20px #6cc1c855,
+          0 2px 0 #fffbe7 inset;
+        transition: all 0.18s cubic-bezier(.4,1.3,.6,1);
+        text-shadow: 0 3px 0 #fcc34688, 0 2px 0 #fff;
+        outline: none;
         white-space: nowrap;
         text-align: center;
+        font-family: 'Comic Sans MS', 'Comic Sans', 'Arial Rounded MT Bold', Arial, sans-serif;
+        filter: drop-shadow(0 2px 8px #fcc34655);
       }
       .control-button:active {
-        transform: scale(0.95);
-        box-shadow: 0 2px 8px rgba(222, 34, 25, 0.4);
+        transform: scale(0.96);
+        box-shadow: 0 2px 8px #fcc34688, 0 1px 0 #fffbe7 inset;
+        background: linear-gradient(120deg, #fcc346 60%, #6cc1c8 100%);
       }
       @keyframes pulse {
         0% {
@@ -82,16 +84,20 @@
       }
       .loading-bar {
         width: 200px;
-        height: 6px;
-        background: rgba(222, 34, 25, 0.2);
-        border-radius: 3px;
+        height: 10px;
+        background: linear-gradient(90deg, #6cc1c8 0%, #fcc346 100%);
+        border-radius: 8px;
         overflow: hidden;
+        box-shadow: 0 2px 8px rgba(108, 193, 200, 0.25), 0 1.5px 0 #fff inset;
+        border: 2.5px solid #fffbe7;
       }
       .progress {
         width: 100%;
         height: 100%;
-        background: #de2219;
+        background: linear-gradient(90deg, #fcc346 0%, #6cc1c8 100%);
         animation: loading 2s infinite;
+        border-radius: 8px;
+        box-shadow: 0 0 8px #fcc34688, 0 0 4px #6cc1c888;
         transform-origin: left;
       }
       @keyframes loading {
@@ -105,6 +111,41 @@
           transform: scaleX(0);
           transform-origin: right;
         }
+      }
+      #loading-screen img {
+        width: 200px;
+        height: 200px;
+        object-fit: contain;
+      }
+      #loading-screen p {
+        color: #f77e21;
+        font-family: 'Comic Sans MS', 'Comic Sans', 'Arial Rounded MT Bold', Arial, sans-serif;
+        margin-top: 10px;
+        font-size: 1.25rem;
+        font-weight: bold;
+        text-shadow:
+          2px 2px 0 #fffbe7,
+          0 2px 8px #fcc34688,
+          0 1px 0 #fff;
+        letter-spacing: 1px;
+        border-radius: 8px;
+        padding: 4px 16px;
+        background: rgba(255,255,255,0.7);
+        display: inline-block;
+      }
+      #watermark-logo {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 1001;
+        opacity: 0.18;
+        pointer-events: none;
+      }
+      #watermark-logo img {
+        width: 70px;
+        height: 70px;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 8px #6cc1c8aa);
       }
     </style>
     <script>
@@ -266,7 +307,7 @@
         const loadingScreen = document.getElementById("loading-screen");
         setTimeout(() => {
           loadingScreen.style.display = "none";
-        }, 3000);
+        }, 3500);
       });
 
       let lastPosition = { x: 0, y: 0, z: 0 };
@@ -579,7 +620,7 @@
         z-index: 10000;
       "
     >
-      <img src="logo.png" />
+      <img src="AR-Kids.png" />
       <div class="loading-bar">
         <div class="progress"></div>
       </div>
@@ -783,5 +824,9 @@
     <audio id="audio-0" src="audio0.mp3"></audio>
     <audio id="audio-1" src="audio1.mp3"></audio>
     <audio id="audio-2" src="audio2.mp3"></audio>
+
+    <div id="watermark-logo">
+      <img src="AR-Kids.png" alt="AR-Kids Logo" />
+    </div>
   </body>
 </html>
