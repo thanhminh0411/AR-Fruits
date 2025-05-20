@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <!-- MindAR 1.1.5 -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
+    <style>
+      video {
+        transform: none;
+      }
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      a-scene {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        min-width: 100vw;
+        min-height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+      }
+      .control-panel {
+        position: absolute;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        padding: 8px 10px;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        z-index: 999;
+        touch-action: manipulation;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        width: auto;
+        max-width: 95%;
+      }
+      .control-button {
+        padding: 7px 8px;
+        font-size: 11px;
+        font-weight: 500;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #ef2e25, #c41c13);
+        color: white;
+        cursor: pointer;
+        touch-action: manipulation;
+        box-shadow: 0 3px 10px rgba(222, 34, 25, 0.3);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        text-align: center;
+      }
+      .control-button:active {
+        transform: scale(0.95);
+        box-shadow: 0 2px 8px rgba(222, 34, 25, 0.4);
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        100% {
+          transform: scale(1.1);
+        }
+      }
+      .loading-bar {
+        width: 200px;
+        height: 6px;
+        background: rgba(222, 34, 25, 0.2);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .progress {
+        width: 100%;
+        height: 100%;
+        background: #de2219;
+        animation: loading 2s infinite;
+        transform-origin: left;
+      }
+      @keyframes loading {
+        0% {
+          transform: scaleX(0);
+        }
+        50% {
+          transform: scaleX(1);
+        }
+        100% {
+          transform: scaleX(0);
+          transform-origin: right;
+        }
+      }
+    </style>
+    <script>
+      let defaultScale = 0.5;
+
+      AFRAME.registerComponent("smooth-follow", {
+        schema: {
+          lerp: { default: 0.03 },
+        },
+
+        init: function () {
+          this.isPositioned = false;
+          this.el.parentEl.addEventListener("targetFound", () => {
+            setTimeout(() => {
+              this.repositionModel();
+              // Thiết lập mô hình vào đúng vị trí ngay lập tức
+              this.isPositioned = true;
+            }, 50);
+          });
+        },
+
+        repositionModel: function () {
+          if (!this.el.parentEl.object3D.visible) return;
+
+          const parentObj = this.el.parentEl.object3D;
+          const obj = this.el.object3D;
+
+          obj.position.copy(parentObj.position);
+          obj.rotation.copy(parentObj.rotation);
+        },
+
+        tick: function () {
+          // Lấy thành phần marker và freeze-tracking
+          const marker = this.el.parentEl.parentEl;
+          const freezeComp = marker && marker.components["freeze-tracking"];
+
+          // Nếu đã đóng băng, thoát ngay lập tức - KHÔNG làm gì cả
+          if (freezeComp && freezeComp.isFrozen) {
+            return;
+          }
+
+          if (this.el.parentEl.object3D.visible) {
+            const parentObj = this.el.parentEl.object3D;
+            const obj = this.el.object3D;
+
+            // Nếu là lần đầu định vị, copy trực tiếp
+            if (!this.isPositioned) {
+              obj.position.copy(parentObj.position);
+              obj.rotation.copy(parentObj.rotation);
+              this.isPositioned = true;
+            } else {
+              // Làm mịn với hệ số lerp
+              obj.position.lerp(parentObj.position, this.data.lerp);
+              obj.rotation.copy(parentObj.rotation);
+            }
+          }
+        },
+      });
+
+      function rotateModel(direction) {
+        for (let i = 0; i <= 5; i++) {
+          const targetEl = document.querySelector(
+            `[mindar-image-target="targetIndex: ${i}"]`
+          );
+          if (targetEl) {
+            const freezeComp = targetEl.components["freeze-tracking"];
+            const isVisible =
+              targetEl.object3D.visible ||
+              (freezeComp && freezeComp.isFrozen && freezeComp.internalVisible);
+
+            if (isVisible) {
+              const container = targetEl.querySelector("[rotate-and-zoom]");
+              const currentRotation = container.getAttribute("rotation");
+              const newY =
+                currentRotation.y + (direction === "left" ? -15 : 15);
+
+              // Chỉ thay đổi góc Y, giữ nguyên X=0 để tránh nghiêng
+              container.setAttribute(
+                "rotation",
+                `0 ${newY} ${currentRotation.z}`
+              );
+
+              // Đồng bộ giá trị rotation trong component
+              if (container.components["rotate-and-zoom"]) {
+                const comp = container.components["rotate-and-zoom"];
+                comp.rotation.y = newY;
+                comp.rotation.x = 0; // Reset góc X về 0
+              }
+
+              console.log(
+                `Xoay model ${i} theo hướng ${direction}. Góc mới: ${newY}`
+              );
+              break;
+            }
+          }
+        }
+      }
+
+      function zoomModel(inOrOut) {
+        for (let i = 0; i <= 5; i++) {
+          const targetEl = document.querySelector(
+            `[mindar-image-target="targetIndex: ${i}"]`
+          );
+          if (targetEl) {
+            // Kiểm tra nếu marker đang hiển thị HOẶC đã bị đóng băng và vẫn hiển thị nội bộ
+            const freezeComp = targetEl.components["freeze-tracking"];
+            const isVisible =
+              targetEl.object3D.visible ||
+              (freezeComp && freezeComp.isFrozen && freezeComp.internalVisible);
+
+            if (isVisible) {
+              const model = targetEl.querySelector("[gltf-model]");
+              let currentScale = model.getAttribute("scale").x;
+
+              if (inOrOut === "in") {
+                currentScale *= 1.1;
+              } else {
+                currentScale /= 1.1;
+              }
+
+              currentScale = Math.min(
+                Math.max(currentScale, defaultScale * 0.3),
+                defaultScale * 5
+              );
+              model.setAttribute(
+                "scale",
+                `${currentScale} ${currentScale} ${currentScale}`
+              );
+              console.log(
+                `Zoom model ${i} ${inOrOut}. Tỷ lệ mới: ${currentScale}`
+              );
+              break;
+            }
+          }
+        }
+      }
+
+      // Thêm hàm debug để kiểm tra trạng thái
+      function checkVisibleModels() {
+        console.log("Kiểm tra các mô hình đang hiển thị:");
+        for (let i = 0; i <= 5; i++) {
+          const targetEl = document.querySelector(
+            `[mindar-image-target="targetIndex: ${i}"]`
+          );
+          if (targetEl) {
+            const freezeComp = targetEl.components["freeze-tracking"];
+            const isVisible = targetEl.object3D.visible;
+            const isFrozen = freezeComp && freezeComp.isFrozen;
+            const internalVisible = freezeComp && freezeComp.internalVisible;
+
+            console.log(
+              `Model ${i}: visible=${isVisible}, frozen=${isFrozen}, internalVisible=${internalVisible}`
+            );
+          }
+        }
+      }
+
+      window.addEventListener("load", () => {
+        const loadingScreen = document.getElementById("loading-screen");
+        setTimeout(() => {
+          loadingScreen.style.display = "none";
+        }, 3000);
+      });
+
+      let lastPosition = { x: 0, y: 0, z: 0 };
+      let lastRotation = { x: 0, y: 0, z: 0 };
+
+      AFRAME.registerComponent("freeze-tracking", {
+        schema: {
+          frameStable: { type: "number", default: 15 }, // Số frame ổn định trước khi freeze
+        },
+
+        init: function () {
+          this.isFrozen = false;
+          this.frozenMatrix = new THREE.Matrix4(); // Ma trận lưu vị trí + quay
+          this.frameStableCount = 0;
+          this.lastMatrix = new THREE.Matrix4(); // Ma trận lần trước để so sánh
+          this.visibleOnce = false; // Đánh dấu đã từng thấy marker
+          this.modelEntity = null;
+          this.hasModel = false;
+
+          this.el.addEventListener("targetFound", () => {
+            this.visibleOnce = true;
+            this.frameStableCount = 0;
+            this.isFrozen = false;
+            this.el.object3D.visible = true;
+          });
+
+          this.el.addEventListener("targetLost", () => {
+            this.startTracking = false;
+            this.isFrozen = false;
+            this.trackingStableCount = 0;
+            this.el.object3D.visible = false; // Ẩn ngay lập tức khi mất marker
+          });
+        },
+
+        tick: function () {
+          const obj = this.el.object3D;
+
+          // Nếu đã freeze thì giữ nguyên vị trí và không update từ marker nữa
+          if (this.isFrozen) {
+            obj.matrix.copy(this.frozenMatrix);
+            obj.matrix.decompose(obj.position, obj.quaternion, obj.scale);
+            return;
+          }
+
+          // Chưa thấy marker thì không làm gì
+          if (!this.visibleOnce) return;
+
+          // Nếu marker đã visible, kiểm tra sự ổn định
+          const currentMatrix = obj.matrix.clone();
+
+          if (this.lastMatrix.equals(currentMatrix)) {
+            this.frameStableCount++;
+          } else {
+            this.frameStableCount = 0;
+          }
+
+          this.lastMatrix.copy(currentMatrix);
+
+          // Nếu đủ số frame ổn định => freeze lại vị trí
+          if (this.frameStableCount >= this.data.frameStable) {
+            console.log("✅ Đã ổn định marker - Freeze mô hình.");
+            this.frozenMatrix.copy(currentMatrix);
+            this.isFrozen = true;
+          }
+        },
+
+        resetFreeze: function () {
+          this.isFrozen = false;
+          this.frameStableCount = 0;
+          this.lastMatrix.identity();
+          this.frozenMatrix.identity();
+          this.visibleOnce = false;
+          this.el.object3D.visible = false;
+        },
+      });
+
+      AFRAME.registerComponent("rotate-and-zoom", {
+        schema: {
+          minScale: { default: 0.3 },
+          maxScale: { default: 5 },
+        },
+        init: function () {
+          this.scale = this.el.getAttribute("scale") || { x: 1, y: 1, z: 1 };
+          this.start = { x: 0, y: 0 };
+          this.isDragging = false;
+          this.initialPinchDistance = null;
+          const scene = this.el.sceneEl;
+          const camera = scene.camera;
+
+          const startDrag = (x, y) => {
+            this.isDragging = true;
+            this.start.x = x;
+            this.start.y = y;
+          };
+
+          const moveDrag = (x, y) => {
+            if (!this.isDragging) return;
+
+            const dx = x - this.start.x;
+            const dy = y - this.start.y;
+
+            // Tính góc xoay (radians)
+            const angleX = THREE.MathUtils.degToRad(dy * 0.4); // lên/xuống
+            const angleY = THREE.MathUtils.degToRad(dx * 0.5); // trái/phải
+
+            const object = this.el.object3D;
+
+            // Lấy trục X (right) từ camera
+            const cameraWorldDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraWorldDirection);
+
+            const cameraWorldUp = new THREE.Vector3();
+            cameraWorldUp.copy(camera.up).applyQuaternion(camera.quaternion);
+
+            const cameraRight = new THREE.Vector3();
+            cameraRight
+              .crossVectors(cameraWorldDirection, cameraWorldUp)
+              .normalize();
+
+            // --- Giới hạn xoay trục X ---
+            const newRotation = new THREE.Euler().copy(object.rotation);
+            newRotation.x += angleX;
+            const minX = THREE.MathUtils.degToRad(-90);
+            const maxX = THREE.MathUtils.degToRad(90);
+            if (newRotation.x >= minX && newRotation.x <= maxX) {
+              object.rotateOnWorldAxis(cameraRight, angleX); // Xoay lên/xuống theo camera
+            }
+
+            // --- Xoay quanh trục Y của chính mô hình ---
+            object.rotateY(angleY); // Xoay trái/phải quanh Y của mô hình
+
+            this.start.x = x;
+            this.start.y = y;
+          };
+
+          const endDrag = () => {
+            this.isDragging = false;
+          };
+
+          // Chuột
+          scene.addEventListener("mousedown", (e) =>
+            startDrag(e.clientX, e.clientY)
+          );
+          window.addEventListener("mousemove", (e) =>
+            moveDrag(e.clientX, e.clientY)
+          );
+          window.addEventListener("mouseup", endDrag);
+
+          // Cảm ứng
+          scene.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 1) {
+              startDrag(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+              this.isDragging = false;
+              this.initialPinchDistance = this.getPinchDistance(e);
+            }
+          });
+
+          scene.addEventListener("touchmove", (e) => {
+            if (e.touches.length === 1) {
+              moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+              const newDist = this.getPinchDistance(e);
+              const zoomFactor = newDist / this.initialPinchDistance;
+              this.applyZoom(zoomFactor);
+              this.initialPinchDistance = newDist;
+            }
+          });
+
+          scene.addEventListener("touchend", endDrag);
+
+          // Zoom chuột
+          scene.addEventListener("wheel", (e) => {
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            this.applyZoom(zoomFactor);
+          });
+        },
+
+        getPinchDistance: function (e) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          return Math.sqrt(dx * dx + dy * dy);
+        },
+
+        applyZoom: function (factor) {
+          const newScale = this.scale.x * factor;
+          const limited = Math.min(
+            this.data.maxScale,
+            Math.max(this.data.minScale, newScale)
+          );
+          this.scale = { x: limited, y: limited, z: limited };
+          this.el.setAttribute("scale", this.scale);
+        },
+      });
+
+      document.addEventListener("DOMContentLoaded", (event) => {
+        // Ngăn scroll nhưng không ngăn click
+        document.querySelector(".control-panel").addEventListener(
+          "touchmove",
+          (event) => {
+            event.preventDefault();
+          },
+          { passive: false }
+        );
+
+        // Thêm xử lý sự kiện chạm cho các nút
+        const buttons = document.querySelectorAll(".control-button");
+        buttons.forEach((button) => {
+          // Chặn sự kiện touchstart từ việc lan truyền đến scene
+          button.addEventListener("touchstart", (event) => {
+            event.stopPropagation();
+          });
+
+          // Chặn và kích hoạt click khi touchend
+          button.addEventListener("touchend", (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            // Kích hoạt sự kiện click thủ công
+            button.click();
+          });
+        });
+      });
+
+      document.addEventListener("DOMContentLoaded", () => {
+        let currentAudioIndex = null;
+        const replayBtn = document.getElementById("replay-btn");
+
+        function replayAudio() {
+          if (currentAudioIndex === null) return;
+
+          const audio = document.getElementById(`audio-${currentAudioIndex}`);
+          if (audio) {
+            audio.currentTime = 0;
+            audio.play();
+            replayBtn.disabled = true;
+
+            audio.onended = () => {
+              replayBtn.disabled = false;
+            };
+          }
+        }
+
+        window.replayAudio = replayAudio; // expose to global scope for onclick
+
+        for (let i = 0; i <= 2; i++) {
+          const target = document.querySelector(
+            `[mindar-image-target="targetIndex: ${i}"]`
+          );
+          if (target) {
+            target.addEventListener("targetFound", () => {
+              for (let j = 0; j <= 2; j++) {
+                const audio = document.getElementById(`audio-${j}`);
+                if (audio) {
+                  audio.pause();
+                  audio.currentTime = 0;
+                }
+              }
+
+              const audio = document.getElementById(`audio-${i}`);
+              if (audio) {
+                currentAudioIndex = i;
+                replayBtn.disabled = true;
+
+                // play only if user gesture occurred
+                audio.currentTime = 0;
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                  playPromise.catch((e) => {
+                    console.warn("Autoplay prevented:", e);
+                  });
+                }
+
+                audio.onended = () => {
+                  replayBtn.disabled = false;
+                };
+              }
+            });
+
+            target.addEventListener("targetLost", () => {
+              const audio = document.getElementById(`audio-${i}`);
+              if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+              }
+
+              if (currentAudioIndex === i) {
+                currentAudioIndex = null;
+                replayBtn.disabled = true;
+              }
+            });
+          }
+        }
+      });
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <div
+      id="loading-screen"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #ffffff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <img src="logo.png" />
+      <div class="loading-bar">
+        <div class="progress"></div>
+      </div>
+      <p style="color: #666; font-family: Arial, sans-serif; margin-top: 10px">
+        Đang tải dữ liệu 3D...
+      </p>
+    </div>
+    <a-scene
+      mindar-image="imageTargetSrc: targets-fruits.mind; autoStart: true; uiScanning: true; uiLoading: true;
+                filterMinCF: 0.0001; filterBeta: 0.001;"
+      physics="gravity: -9.8; debug: false"
+      color-space="sRGB"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      embedded
+      renderer="colorManagement: true; physicallyCorrectLights: true"
+    >
+      <a-assets>
+        <a-asset-item id="model0" src="assets/carot.glb"></a-asset-item>
+        <a-asset-item id="model1" src="assets/cherry.glb"></a-asset-item>
+        <a-asset-item id="model2" src="assets/chuoi.glb"></a-asset-item>
+        <a-asset-item id="model3" src="assets/nho.glb"></a-asset-item>
+        <a-asset-item id="model4" src="assets/tao.glb"></a-asset-item>
+      </a-assets>
+      <!-- Các đèn chiếu sáng toàn hướng -->
+      <a-light type="ambient" color="#ffffff" intensity="1.0"></a-light>
+
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="1.0"
+        position="0 4 0"
+      ></a-light>
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="0.6"
+        position="0 -4 0"
+      ></a-light>
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="0.8"
+        position="0 0 4"
+      ></a-light>
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="0.7"
+        position="0 0 -4"
+      ></a-light>
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="0.6"
+        position="-4 0 0"
+      ></a-light>
+      <a-light
+        type="directional"
+        color="#ffffff"
+        intensity="0.6"
+        position="4 0 0"
+      ></a-light>
+      <!-- Target 0 -->
+      <a-entity mindar-image-target="targetIndex: 0" freeze-tracking>
+        <a-plane
+          width="1"
+          height="1"
+          visible="false"
+          rotation="-90 0 0"
+          static-body
+        ></a-plane>
+        <!-- Lớp dùng để cố định vị trí marker -->
+        <a-entity id="model-anchor" position="0 0 0" rotation="0 0 0">
+          <a-entity id="model-container-0" rotation="0 0 0" rotate-and-zoom>
+            <a-entity
+              id="model-0"
+              gltf-model="#model0"
+              position="0 0 0"
+              scale="0.5 0.5 0.5"
+              rotation="0 180 0"
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Target 1 -->
+      <a-entity mindar-image-target="targetIndex: 1" freeze-tracking>
+        <a-plane
+          width="1"
+          height="1"
+          visible="false"
+          rotation="-90 0 0"
+          static-body
+        ></a-plane>
+        <a-entity id="anchor-1">
+          <a-entity id="model-container-1" rotation="0 0 0" rotate-and-zoom>
+            <a-entity
+              id="model-1"
+              gltf-model="#model1"
+              position="0 0 0"
+              scale="0.5 0.5 0.5"
+              rotation="0 180 0"
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Target 2 -->
+      <a-entity mindar-image-target="targetIndex: 2" freeze-tracking>
+        <a-plane
+          width="1"
+          height="1"
+          visible="false"
+          rotation="-90 0 0"
+          static-body
+        ></a-plane>
+        <a-entity id="anchor-2">
+          <a-entity id="model-container-2" rotation="0 0 0" rotate-and-zoom>
+            <a-entity
+              id="model-2"
+              gltf-model="#model2"
+              position="0 0 0"
+              scale="0.5 0.5 0.5"
+              rotation="0 180 0"
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Target 3 -->
+      <a-entity mindar-image-target="targetIndex: 3" freeze-tracking>
+        <a-plane
+          width="1"
+          height="1"
+          visible="false"
+          rotation="-90 0 0"
+          static-body
+        ></a-plane>
+        <a-entity id="anchor-3">
+          <a-entity id="model-container-3" rotation="0 0 0" rotate-and-zoom>
+            <a-entity
+              id="model-3"
+              gltf-model="#model3"
+              position="0 0 0"
+              scale="0.5 0.5 0.5"
+              rotation="0 180 0"
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Target 4 -->
+      <a-entity mindar-image-target="targetIndex: 4" freeze-tracking>
+        <a-plane
+          width="1"
+          height="1"
+          visible="false"
+          rotation="-90 0 0"
+          static-body
+        ></a-plane>
+        <a-entity id="anchor-4">
+          <a-entity id="model-container-4" rotation="0 0 0" rotate-and-zoom>
+            <a-entity
+              id="model-4"
+              gltf-model="#model4"
+              position="0 0 0"
+              scale="0.5 0.5 0.5"
+              rotation="0 180 0"
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    </a-scene>
+
+    <div class="control-panel">
+      <button class="control-button" onclick="rotateModel('left')">
+        ⟲ Xoay trái
+      </button>
+      <button class="control-button" onclick="rotateModel('right')">
+        ⟳ Xoay phải
+      </button>
+      <button class="control-button" onclick="zoomModel('out')">
+        － Zoom out
+      </button>
+      <button class="control-button" onclick="zoomModel('in')">
+        ＋ Zoom in
+      </button>
+      <button
+        id="replay-btn"
+        class="control-button"
+        onclick="replayAudio()"
+        disabled
+      >
+        Replay
+      </button>
+    </div>
+    <audio id="audio-0" src="audio0.mp3"></audio>
+    <audio id="audio-1" src="audio1.mp3"></audio>
+    <audio id="audio-2" src="audio2.mp3"></audio>
+  </body>
+</html>
