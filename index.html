@@ -9,7 +9,6 @@
     <!-- MindAR 1.1.5 -->
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.1/dist/aframe-physics-system.min.js"></script>
     <style>
       video {
         transform: none;
@@ -585,6 +584,8 @@
         });
       });
 
+      let isGifMode = false;
+
   document.addEventListener("DOMContentLoaded", () => {
     // Audio cặp cho 3D mode
     const audioPairs = [
@@ -604,7 +605,6 @@
     ];
     let currentPair = null;
     let currentGifAudio = null;
-    let isGifMode = false;
     const replayBtn = document.getElementById("replay-btn");
     const toggleBtn = document.getElementById("toggle-mode-btn");
 
@@ -678,7 +678,6 @@
   });
 
       document.addEventListener("DOMContentLoaded", () => {
-        let isGifMode = false;
         const toggleBtn = document.getElementById('toggle-mode-btn');
         toggleBtn.addEventListener('click', () => {
           isGifMode = !isGifMode;
@@ -726,26 +725,25 @@
     });
   },
   tick: function (t, dt) {
-    // Nếu chưa có material, thử lấy lại (phòng trường hợp sự kiện chưa bắn)
-    if (!this.material && this.el.getObject3D('mesh')) {
-      this.material = this.el.getObject3D('mesh').material;
-      if (this.material && this.material.map) {
-        this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
-        this.material.map.offset.set(0, 1 - 1/this.data.rows);
-      }
+  if (!this.material && this.el.getObject3D('mesh')) {
+    this.material = this.el.getObject3D('mesh').material;
+    if (this.material && this.material.map) {
+      this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
+      this.material.map.offset.set(0, 1 - 1/this.data.rows);
     }
-    if (!this.material) return;
-    this.time += dt;
-    if (this.time > 1000/this.data.fps) {
-      this.time = 0;
-      this.frame = (this.frame + 1) % this.data.total;
-      const col = this.frame % this.data.cols;
-      const row = Math.floor(this.frame / this.data.cols);
-      this.material.map.offset.set(
-        col / this.data.cols,
-        1 - (row + 1) / this.data.rows
-      );
-    }
+  }
+  if (!this.material || !this.material.map) return; // Thêm dòng này
+  this.time += dt;
+  if (this.time > 1000/this.data.fps) {
+    this.time = 0;
+    this.frame = (this.frame + 1) % this.data.total;
+    const col = this.frame % this.data.cols;
+    const row = Math.floor(this.frame / this.data.cols);
+    this.material.map.offset.set(
+      col / this.data.cols,
+      1 - (row + 1) / this.data.rows
+    );
+  }
   }
 });
     </script>
@@ -778,7 +776,6 @@
     <a-scene
       mindar-image="imageTargetSrc: targets-fruits.mind; autoStart: true; uiScanning: true; uiLoading: true;
                 filterMinCF: 0.0001; filterBeta: 0.001;"
-      physics="gravity: -9.8; debug: false"
       color-space="sRGB"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
@@ -838,7 +835,6 @@
           height="1"
           visible="false"
           rotation="-90 0 0"
-          static-body
         ></a-plane>
         <!-- Lớp dùng để cố định vị trí marker -->
         <a-entity id="model-anchor" position="0 0 0" rotation="0 0 0">
@@ -872,7 +868,7 @@
           height="1"
           visible="false"
           rotation="-90 0 0"
-          static-body
+          
         ></a-plane>
         <a-entity id="anchor-1">
           <a-entity id="model-container-1" rotation="0 0 0" rotate-and-zoom>
@@ -906,7 +902,7 @@
           height="1"
           visible="false"
           rotation="-90 0 0"
-          static-body
+        
         ></a-plane>
         <a-entity id="anchor-2">
           <a-entity id="model-container-2" rotation="0 0 0" rotate-and-zoom>
@@ -938,7 +934,7 @@
           height="1"
           visible="false"
           rotation="-90 0 0"
-          static-body
+      
         ></a-plane>
         <a-entity id="anchor-3">
           <a-entity id="model-container-3" rotation="0 0 0" rotate-and-zoom>
@@ -970,7 +966,7 @@
           height="1"
           visible="false"
           rotation="-90 0 0"
-          static-body
+        
         ></a-plane>
         <a-entity id="anchor-4">
           <a-entity id="model-container-4" rotation="0 0 0" rotate-and-zoom>
