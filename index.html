@@ -203,6 +203,9 @@
     </style>
     <script>
       let defaultScale = 0.5;
+      let isGifMode = false;
+      let currentPair = null;
+      let currentGifAudio = null;
 
       AFRAME.registerComponent("smooth-follow", {
         schema: {
@@ -584,84 +587,135 @@
         });
       });
 
-      let isGifMode = false;
+let currentMarkerIndex = -1; // Theo dõi marker hiện tại
+      document.addEventListener("DOMContentLoaded", () => {
+  // Audio cặp cho 3D mode
+  const audioPairs = [
+    ["audio/1.mp3", "audio/2.mp3"],
+    ["audio/3.mp3", "audio/4.mp3"],
+    ["audio/5.mp3", "audio/6.mp3"],
+    ["audio/7.mp3", "audio/8.mp3"],
+    ["audio/9.mp3", "audio/10.mp3"]
+  ];
+  // Audio đơn cho GIF mode
+  const gifAudios = [
+    "audio/carrot.mp3",
+    "audio/cherry.mp3",
+    "audio/banana.mp3",
+    "audio/nho.mp3",
+    "audio/tao.mp3"
+  ];
 
-  document.addEventListener("DOMContentLoaded", () => {
-    // Audio cặp cho 3D mode
-    const audioPairs = [
-      ["audio/1.mp3", "audio/2.mp3"],
-      ["audio/3.mp3", "audio/4.mp3"],
-      ["audio/5.mp3", "audio/6.mp3"],
-      ["audio/7.mp3", "audio/8.mp3"],
-      ["audio/9.mp3", "audio/10.mp3"]
-    ];
-    // Audio đơn cho GIF mode
-    const gifAudios = [
-      "audio/carrot.mp3",
-      "audio/cherry.mp3",
-      "audio/banana.mp3",
-      "audio/nho.mp3",
-      "audio/tao.mp3"
-    ];
-    let currentPair = null;
-    let currentGifAudio = null;
-    const replayBtn = document.getElementById("replay-btn");
-    const toggleBtn = document.getElementById("toggle-mode-btn");
+  const replayBtn = document.getElementById("replay-btn");
+  const toggleBtn = document.getElementById("toggle-mode-btn");
 
-    // Hàm phát cặp audio với delay 1s (3D mode)
-    function playAudioPair(pair) {
-      if (!pair) return;
-      const audio1 = new Audio(pair[0]);
-      const audio2 = new Audio(pair[1]);
-      replayBtn.disabled = true;
+  // Preload tất cả âm thanh
+  const preloadedAudios = {};
 
-      audio1.play();
-      audio1.onended = () => {
-        setTimeout(() => {
-          audio2.play();
-          audio2.onended = () => {
-            replayBtn.disabled = false;
-          };
-        }, 1000);
-      };
-    }
+  function preloadAudio(src) {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    preloadedAudios[src] = audio;
+  }
 
-    // Hàm phát audio đơn (GIF mode)
-    function playGifAudio(audioPath) {
-      if (!audioPath) return;
-      const audio = new Audio(audioPath);
-      replayBtn.disabled = true;
-      audio.play();
-      audio.onended = () => {
-        replayBtn.disabled = false;
-      };
-    }
+  // Preload tất cả âm thanh trong audioPairs và gifAudios
+  audioPairs.flat().forEach(preloadAudio);
+  gifAudios.forEach(preloadAudio);
 
-    window.replayAudio = function() {
-      if (isGifMode && currentGifAudio) {
-        playGifAudio(currentGifAudio);
-      } else if (!isGifMode && currentPair) {
-        playAudioPair(currentPair);
-      }
+
+  // Hàm phát cặp audio với delay 1s (3D mode)
+  function playAudioPair(pair) {
+    if (!pair) return;
+    const audio1 = new Audio(pair[0]);
+    const audio2 = new Audio(pair[1]);
+    replayBtn.disabled = true;
+
+    audio1.play().catch(e => console.warn("Audio autoplay prevented:", e));
+    audio1.onended = () => {
+      setTimeout(() => {
+        audio2.play().catch(e => console.warn("Audio autoplay prevented:", e));
+        audio2.onended = () => {
+          replayBtn.disabled = false;
+        };
+      }, 1000);
     };
+  }
 
-    // Theo dõi trạng thái mode
-    if (toggleBtn) {
-  toggleBtn.addEventListener('click', () => {
-    isGifMode = !isGifMode;
-    // Phát lại âm thanh đúng mode nếu đang có marker active
+  // Hàm phát audio đơn (GIF mode)
+  function playGifAudio(audioPath) {
+    if (!audioPath) return;
+    const audio = new Audio(audioPath);
+    replayBtn.disabled = true;
+    audio.play().catch(e => console.warn("Audio autoplay prevented:", e));
+    audio.onended = () => {
+      replayBtn.disabled = false;
+    };
+  }
+
+  // Hàm phát lại âm thanh
+  window.replayAudio = function () {
+    if (currentMarkerIndex === -1) return; // Không có marker nào được nhận diện
     if (isGifMode && currentGifAudio) {
       playGifAudio(currentGifAudio);
     } else if (!isGifMode && currentPair) {
       playAudioPair(currentPair);
     }
-  });
-}
+  };
 
-    for (let i = 0; i < audioPairs.length; i++) {
-      const target = document.querySelector(`[mindar-image-target="targetIndex: ${i}"]`);
-      if (target) {
-        target.addEventListener("targetFound", () => {
+  // Cập nhật UI mode
+  function updateMode() {
+    console.log("Đang cập nhật mode:", isGifMode ? "GIF" : "3D");
+    for (let i = 0; i <= 4; i++) {
+      const modelContainer = document.getElementById(`model-container-${i}`);
+      const gifEntity = document.getElementById(`gif-${i}`);
+      if (modelContainer && gifEntity) {
+        if (isGifMode) {
+          modelContainer.setAttribute("visible", "false");
+          gifEntity.setAttribute("visible", "true");
+        } else {
+          modelContainer.setAttribute("visible", "true");
+          gifEntity.setAttribute("visible", "false");
+        }
+      }
+    }
+    // Disable/enable interaction buttons in GIF mode
+    document.querySelectorAll(".control-button").forEach(btn => {
+      if (btn.id !== "toggle-mode-btn" && btn.id !== "replay-btn") {
+        btn.disabled = isGifMode;
+      }
+    });
+  }
+
+  // Xử lý nút toggle
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      isGifMode = !isGifMode;
+      toggleBtn.textContent = isGifMode ? "GIF" : "3D";
+      updateMode();
+
+      // Phát lại âm thanh đúng mode nếu đang có marker active
+      if (currentMarkerIndex >= 0) {
+        if (isGifMode) {
+          currentGifAudio = gifAudios[currentMarkerIndex];
+          playGifAudio(currentGifAudio);
+        } else {
+          currentPair = audioPairs[currentMarkerIndex];
+          playAudioPair(currentPair);
+        }
+      }
+
+      console.log("Đã chuyển sang mode:", isGifMode ? "GIF" : "3D");
+    });
+  }
+
+  // Xử lý marker detection
+  for (let i = 0; i < 5; i++) {
+    const target = document.querySelector(`[mindar-image-target="targetIndex: ${i}"]`);
+    if (target) {
+      target.addEventListener("targetFound", () => {
+        console.log(`Đã tìm thấy target ${i}`);
+        if (i !== currentMarkerIndex) {
+          currentMarkerIndex = i; // Cập nhật marker hiện tại
           if (isGifMode) {
             currentGifAudio = gifAudios[i];
             playGifAudio(currentGifAudio);
@@ -669,45 +723,24 @@
             currentPair = audioPairs[i];
             playAudioPair(currentPair);
           }
-        });
-        target.addEventListener("targetLost", () => {
-          // Không cần xử lý gì thêm
-        });
-      }
-    }
-  });
-
-      document.addEventListener("DOMContentLoaded", () => {
-        const toggleBtn = document.getElementById('toggle-mode-btn');
-        toggleBtn.addEventListener('click', () => {
-          isGifMode = !isGifMode;
-          updateMode();
-          toggleBtn.textContent = isGifMode ? 'GIF' : '3D';
-        });
-
-        function updateMode() {
-          for (let i = 0; i <= 4; i++) {
-            const modelContainer = document.getElementById(`model-container-${i}`);
-            const gifEntity = document.getElementById(`gif-${i}`);
-            if (modelContainer && gifEntity) {
-              if (isGifMode) {
-                modelContainer.setAttribute('visible', 'false');
-                gifEntity.setAttribute('visible', 'true');
-              } else {
-                modelContainer.setAttribute('visible', 'true');
-                gifEntity.setAttribute('visible', 'false');
-              }
-            }
-          }
-          // Disable/enable interaction buttons in GIF mode
-          document.querySelectorAll('.control-button').forEach(btn => {
-            if (btn.id !== 'toggle-mode-btn') {
-              btn.disabled = isGifMode;
-            }
-          });
         }
       });
-      AFRAME.registerComponent('sprite-anim', {
+
+      target.addEventListener("targetLost", () => {
+        if (i === currentMarkerIndex) {
+          currentMarkerIndex = -1; // Reset marker hiện tại khi mất marker
+          console.log(`Mất target ${i}`);
+        }
+      });
+    }
+  }
+
+  // Khởi tạo trạng thái ban đầu
+  updateMode();
+});
+
+     
+     AFRAME.registerComponent('sprite-anim', {
   schema: {
     cols: {type: 'int', default: 4},
     rows: {type: 'int', default: 1},
@@ -720,32 +753,35 @@
     this.material = null;
     this.el.addEventListener('materialtextureloaded', () => {
       this.material = this.el.getObject3D('mesh').material;
-      this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
-      this.material.map.offset.set(0, 1 - 1/this.data.rows);
+      if (this.material && this.material.map) {
+        this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
+        this.material.map.offset.set(0, 1 - 1/this.data.rows);
+      }
     });
   },
   tick: function (t, dt) {
-  if (!this.material && this.el.getObject3D('mesh')) {
-    this.material = this.el.getObject3D('mesh').material;
-    if (this.material && this.material.map) {
-      this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
-      this.material.map.offset.set(0, 1 - 1/this.data.rows);
+    if (!this.material && this.el.getObject3D('mesh')) {
+      this.material = this.el.getObject3D('mesh').material;
+      if (this.material && this.material.map) {
+        this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
+        this.material.map.offset.set(0, 1 - 1/this.data.rows);
+      }
     }
-  }
-  if (!this.material || !this.material.map) return; // Thêm dòng này
-  this.time += dt;
-  if (this.time > 1000/this.data.fps) {
-    this.time = 0;
-    this.frame = (this.frame + 1) % this.data.total;
-    const col = this.frame % this.data.cols;
-    const row = Math.floor(this.frame / this.data.cols);
-    this.material.map.offset.set(
-      col / this.data.cols,
-      1 - (row + 1) / this.data.rows
-    );
-  }
-  }
-});
+    if (!this.material || !this.material.map) return;
+    
+    this.time += dt;
+    if (this.time > 1000/this.data.fps) {  // Đã thêm dấu ngoặc mở thiếu
+      this.time = 0;
+      this.frame = (this.frame + 1) % this.data.total;
+      const col = this.frame % this.data.cols;
+      const row = Math.floor(this.frame / this.data.cols);
+      this.material.map.offset.set(
+        col / this.data.cols,
+        1 - (row + 1) / this.data.rows
+      );
+    }
+  }  
+}); 
     </script>
   </head>
   <body style="margin: 0; overflow: hidden">
