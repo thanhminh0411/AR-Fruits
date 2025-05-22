@@ -194,6 +194,13 @@
           height: 40px;
         }
       }
+
+      #toggle-mode-btn {
+        font-size: 1.1rem;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 0 10px;
+      }
     </style>
     <script>
       let defaultScale = 0.5;
@@ -578,76 +585,169 @@
         });
       });
 
+  document.addEventListener("DOMContentLoaded", () => {
+    // Audio cặp cho 3D mode
+    const audioPairs = [
+      ["audio/1.mp3", "audio/2.mp3"],
+      ["audio/3.mp3", "audio/4.mp3"],
+      ["audio/5.mp3", "audio/6.mp3"],
+      ["audio/7.mp3", "audio/8.mp3"],
+      ["audio/9.mp3", "audio/10.mp3"]
+    ];
+    // Audio đơn cho GIF mode
+    const gifAudios = [
+      "audio/carrot.mp3",
+      "audio/cherry.mp3",
+      "audio/banana.mp3",
+      "audio/nho.mp3",
+      "audio/tao.mp3"
+    ];
+    let currentPair = null;
+    let currentGifAudio = null;
+    let isGifMode = false;
+    const replayBtn = document.getElementById("replay-btn");
+    const toggleBtn = document.getElementById("toggle-mode-btn");
+
+    // Hàm phát cặp audio với delay 1s (3D mode)
+    function playAudioPair(pair) {
+      if (!pair) return;
+      const audio1 = new Audio(pair[0]);
+      const audio2 = new Audio(pair[1]);
+      replayBtn.disabled = true;
+
+      audio1.play();
+      audio1.onended = () => {
+        setTimeout(() => {
+          audio2.play();
+          audio2.onended = () => {
+            replayBtn.disabled = false;
+          };
+        }, 1000);
+      };
+    }
+
+    // Hàm phát audio đơn (GIF mode)
+    function playGifAudio(audioPath) {
+      if (!audioPath) return;
+      const audio = new Audio(audioPath);
+      replayBtn.disabled = true;
+      audio.play();
+      audio.onended = () => {
+        replayBtn.disabled = false;
+      };
+    }
+
+    window.replayAudio = function() {
+      if (isGifMode && currentGifAudio) {
+        playGifAudio(currentGifAudio);
+      } else if (!isGifMode && currentPair) {
+        playAudioPair(currentPair);
+      }
+    };
+
+    // Theo dõi trạng thái mode
+    if (toggleBtn) {
+  toggleBtn.addEventListener('click', () => {
+    isGifMode = !isGifMode;
+    // Phát lại âm thanh đúng mode nếu đang có marker active
+    if (isGifMode && currentGifAudio) {
+      playGifAudio(currentGifAudio);
+    } else if (!isGifMode && currentPair) {
+      playAudioPair(currentPair);
+    }
+  });
+}
+
+    for (let i = 0; i < audioPairs.length; i++) {
+      const target = document.querySelector(`[mindar-image-target="targetIndex: ${i}"]`);
+      if (target) {
+        target.addEventListener("targetFound", () => {
+          if (isGifMode) {
+            currentGifAudio = gifAudios[i];
+            playGifAudio(currentGifAudio);
+          } else {
+            currentPair = audioPairs[i];
+            playAudioPair(currentPair);
+          }
+        });
+        target.addEventListener("targetLost", () => {
+          // Không cần xử lý gì thêm
+        });
+      }
+    }
+  });
+
       document.addEventListener("DOMContentLoaded", () => {
-        let currentAudioIndex = null;
-        const replayBtn = document.getElementById("replay-btn");
+        let isGifMode = false;
+        const toggleBtn = document.getElementById('toggle-mode-btn');
+        toggleBtn.addEventListener('click', () => {
+          isGifMode = !isGifMode;
+          updateMode();
+          toggleBtn.textContent = isGifMode ? 'GIF' : '3D';
+        });
 
-        function replayAudio() {
-          if (currentAudioIndex === null) return;
-
-          const audio = document.getElementById(`audio-${currentAudioIndex}`);
-          if (audio) {
-            audio.currentTime = 0;
-            audio.play();
-            replayBtn.disabled = true;
-
-            audio.onended = () => {
-              replayBtn.disabled = false;
-            };
+        function updateMode() {
+          for (let i = 0; i <= 4; i++) {
+            const modelContainer = document.getElementById(`model-container-${i}`);
+            const gifEntity = document.getElementById(`gif-${i}`);
+            if (modelContainer && gifEntity) {
+              if (isGifMode) {
+                modelContainer.setAttribute('visible', 'false');
+                gifEntity.setAttribute('visible', 'true');
+              } else {
+                modelContainer.setAttribute('visible', 'true');
+                gifEntity.setAttribute('visible', 'false');
+              }
+            }
           }
-        }
-
-        window.replayAudio = replayAudio; // expose to global scope for onclick
-
-        for (let i = 0; i <= 2; i++) {
-          const target = document.querySelector(
-            `[mindar-image-target="targetIndex: ${i}"]`
-          );
-          if (target) {
-            target.addEventListener("targetFound", () => {
-              for (let j = 0; j <= 2; j++) {
-                const audio = document.getElementById(`audio-${j}`);
-                if (audio) {
-                  audio.pause();
-                  audio.currentTime = 0;
-                }
-              }
-
-              const audio = document.getElementById(`audio-${i}`);
-              if (audio) {
-                currentAudioIndex = i;
-                replayBtn.disabled = true;
-
-                // play only if user gesture occurred
-                audio.currentTime = 0;
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                  playPromise.catch((e) => {
-                    console.warn("Autoplay prevented:", e);
-                  });
-                }
-
-                audio.onended = () => {
-                  replayBtn.disabled = false;
-                };
-              }
-            });
-
-            target.addEventListener("targetLost", () => {
-              const audio = document.getElementById(`audio-${i}`);
-              if (audio) {
-                audio.pause();
-                audio.currentTime = 0;
-              }
-
-              if (currentAudioIndex === i) {
-                currentAudioIndex = null;
-                replayBtn.disabled = true;
-              }
-            });
-          }
+          // Disable/enable interaction buttons in GIF mode
+          document.querySelectorAll('.control-button').forEach(btn => {
+            if (btn.id !== 'toggle-mode-btn') {
+              btn.disabled = isGifMode;
+            }
+          });
         }
       });
+      AFRAME.registerComponent('sprite-anim', {
+  schema: {
+    cols: {type: 'int', default: 4},
+    rows: {type: 'int', default: 1},
+    total: {type: 'int', default: 4},
+    fps: {type: 'number', default: 8}
+  },
+  init: function () {
+    this.frame = 0;
+    this.time = 0;
+    this.material = null;
+    this.el.addEventListener('materialtextureloaded', () => {
+      this.material = this.el.getObject3D('mesh').material;
+      this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
+      this.material.map.offset.set(0, 1 - 1/this.data.rows);
+    });
+  },
+  tick: function (t, dt) {
+    // Nếu chưa có material, thử lấy lại (phòng trường hợp sự kiện chưa bắn)
+    if (!this.material && this.el.getObject3D('mesh')) {
+      this.material = this.el.getObject3D('mesh').material;
+      if (this.material && this.material.map) {
+        this.material.map.repeat.set(1/this.data.cols, 1/this.data.rows);
+        this.material.map.offset.set(0, 1 - 1/this.data.rows);
+      }
+    }
+    if (!this.material) return;
+    this.time += dt;
+    if (this.time > 1000/this.data.fps) {
+      this.time = 0;
+      this.frame = (this.frame + 1) % this.data.total;
+      const col = this.frame % this.data.cols;
+      const row = Math.floor(this.frame / this.data.cols);
+      this.material.map.offset.set(
+        col / this.data.cols,
+        1 - (row + 1) / this.data.rows
+      );
+    }
+  }
+});
     </script>
   </head>
   <body style="margin: 0; overflow: hidden">
@@ -751,6 +851,17 @@
               rotation="0 180 0"
             ></a-entity>
           </a-entity>
+          <!-- Thêm entity GIF, mặc định ẩn -->
+          <a-entity id="gif-0" visible="false">
+            <a-image 
+              src="assets/carrot-sprite.png"
+              width="1.2"
+              height="1.1"
+              position="0 0.18 0.01"
+              sprite-anim="cols:5; rows:7; total:31; fps:15"
+              transparent="true"
+            ></a-image>
+          </a-entity>
         </a-entity>
       </a-entity>
 
@@ -774,6 +885,18 @@
             ></a-entity>
           </a-entity>
         </a-entity>
+        <!-- Target 1: Cherry -->
+<a-entity id="gif-1" visible="false">
+  <a-image 
+    src="assets/cherry-sprite.png"
+    width="1.2"
+    height="1.1"
+    position="0 0.18 0.01"
+    rotation="0 -180 0"
+    sprite-anim="cols:5; rows:15; total:75; fps:30"
+    transparent="true"
+  ></a-image>
+</a-entity>
       </a-entity>
 
       <!-- Target 2 -->
@@ -796,6 +919,16 @@
             ></a-entity>
           </a-entity>
         </a-entity>
+<a-entity id="gif-2" visible="false">
+  <a-image 
+    src="assets/chuoi-sprite.png"
+    width="1.1"
+    height="1.1"
+    position="0 0.18 0.01"
+    sprite-anim="cols:4; rows:1; total:4; fps:8"
+    transparent="true"
+  ></a-image>
+</a-entity>
       </a-entity>
 
       <!-- Target 3 -->
@@ -818,6 +951,16 @@
             ></a-entity>
           </a-entity>
         </a-entity>
+<a-entity id="gif-3" visible="false">
+  <a-image 
+    src="assets/nho-sprite.png"
+    width="1.3"
+    height="1.2"
+    position="0 0.15 0.01"
+    sprite-anim="cols:5; rows:20; total:100; fps:30"
+    transparent="true"
+  ></a-image>
+</a-entity>
       </a-entity>
 
       <!-- Target 4 -->
@@ -840,6 +983,16 @@
             ></a-entity>
           </a-entity>
         </a-entity>
+        <a-entity id="gif-4" visible="false">
+  <a-image 
+    src="assets/tao-sprite.png"
+    width="1.3"
+    height="1.1"
+    position="0 0.15 0.01"
+    sprite-anim="cols:5; rows:25; total:125; fps:30"
+    transparent="true"
+  ></a-image>
+</a-entity>
       </a-entity>
 
 
@@ -900,10 +1053,8 @@
           </svg>
         </span>
       </button>
+      <button id="toggle-mode-btn" class="control-button" title="Chuyển chế độ">3D</button>
     </div>
-    <audio id="audio-0" src="audio0.mp3"></audio>
-    <audio id="audio-1" src="audio1.mp3"></audio>
-    <audio id="audio-2" src="audio2.mp3"></audio>
 
     <div id="watermark-logo">
       <img src="AR-Kids.png" alt="AR-Kids Logo" />
