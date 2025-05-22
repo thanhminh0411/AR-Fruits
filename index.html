@@ -687,53 +687,55 @@ let currentMarkerIndex = -1; // Theo dõi marker hiện tại
   }
 
   // Xử lý nút toggle
-  if (toggleBtn) {
-    toggleBtn.addEventListener("click", () => {
-      isGifMode = !isGifMode;
-      toggleBtn.textContent = isGifMode ? "GIF" : "3D";
-      updateMode();
+if (toggleBtn) {
+  toggleBtn.addEventListener("click", () => {
+    isGifMode = !isGifMode;
+    toggleBtn.textContent = isGifMode ? "GIF" : "3D";
+    updateMode();
 
-      // Phát lại âm thanh đúng mode nếu đang có marker active
-      if (currentMarkerIndex >= 0) {
-        if (isGifMode) {
-          currentGifAudio = gifAudios[currentMarkerIndex];
-          playGifAudio(currentGifAudio);
-        } else {
-          currentPair = audioPairs[currentMarkerIndex];
-          playAudioPair(currentPair);
-        }
+    // Phát lại âm thanh đúng mode nếu đang có marker active
+    if (currentMarkerIndex >= 0) {
+      if (isGifMode) {
+        currentGifAudio = gifAudios[currentMarkerIndex];
+        playGifAudio(currentGifAudio);
+      } else {
+        currentPair = audioPairs[currentMarkerIndex];
+        playAudioPair(currentPair);
+      }
+    }
+
+    console.log("Đã chuyển sang mode:", isGifMode ? "GIF" : "3D");
+  });
+}
+
+// Xử lý marker detection
+for (let i = 0; i < 5; i++) {
+  const target = document.querySelector(`[mindar-image-target="targetIndex: ${i}"]`);
+  if (target) {
+    target.addEventListener("targetFound", () => {
+      console.log(`Đã tìm thấy target ${i}`);
+      if (i !== currentMarkerIndex) {
+        currentMarkerIndex = i; // Cập nhật marker hiện tại
       }
 
-      console.log("Đã chuyển sang mode:", isGifMode ? "GIF" : "3D");
+      // Phát âm thanh tương ứng với chế độ hiện tại
+      if (isGifMode) {
+        currentGifAudio = gifAudios[i];
+        playGifAudio(currentGifAudio);
+      } else {
+        currentPair = audioPairs[i];
+        playAudioPair(currentPair);
+      }
+    });
+
+    target.addEventListener("targetLost", () => {
+      if (i === currentMarkerIndex) {
+        currentMarkerIndex = -1; // Reset marker hiện tại khi mất marker
+        console.log(`Mất target ${i}`);
+      }
     });
   }
-
-  // Xử lý marker detection
-  for (let i = 0; i < 5; i++) {
-    const target = document.querySelector(`[mindar-image-target="targetIndex: ${i}"]`);
-    if (target) {
-      target.addEventListener("targetFound", () => {
-        console.log(`Đã tìm thấy target ${i}`);
-        if (i !== currentMarkerIndex) {
-          currentMarkerIndex = i; // Cập nhật marker hiện tại
-          if (isGifMode) {
-            currentGifAudio = gifAudios[i];
-            playGifAudio(currentGifAudio);
-          } else {
-            currentPair = audioPairs[i];
-            playAudioPair(currentPair);
-          }
-        }
-      });
-
-      target.addEventListener("targetLost", () => {
-        if (i === currentMarkerIndex) {
-          currentMarkerIndex = -1; // Reset marker hiện tại khi mất marker
-          console.log(`Mất target ${i}`);
-        }
-      });
-    }
-  }
+}
 
   // Khởi tạo trạng thái ban đầu
   updateMode();
